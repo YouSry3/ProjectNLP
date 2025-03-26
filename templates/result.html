@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Result</title>
+    <style>
+        body { font-family: Arial; text-align: center; margin-top: 50px; }
+        .container { max-width: 600px; margin: 0 auto; }
+        img { max-width: 100%; margin: 20px 0; }
+        .caption { font-size: 1.2em; padding: 15px; border: 1px solid #ddd; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Generated Caption</h1>
+        <img src="{{ image_path }}">
+        <div class="caption">{{ caption }}</div>
+        <a href="/">Try another image</a>
+    </div>
+</body>
+</html>
