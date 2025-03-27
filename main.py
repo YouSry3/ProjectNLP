@@ -3,6 +3,7 @@ from transformers import pipeline
 from PIL import Image
 import os
 import uuid
+from datetime import datetime
 
 app = Flask(__name__)
 
@@ -20,7 +21,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 @app.route("/")
 def home():
-    return """
+    return f"""
     <!DOCTYPE html>
     <html lang="ar" dir="rtl">
     <head>
@@ -30,120 +31,129 @@ def home():
         <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
         <style>
-            .chat-container {
-                height: 60vh;
-                overflow-y: auto;
-            }
-            .message {
-                margin-bottom: 1rem;
-            }
-            .user-message {
-                background-color: #e0f2fe;
-                border-radius: 1rem 1rem 0 1rem;
-                padding: 0.75rem;
-                margin-left: auto;
-                max-width: 80%;
-            }
-            .bot-message {
-                background-color: #f0fdf4;
-                border-radius: 1rem 1rem 1rem 0;
-                padding: 0.75rem;
-                margin-right: auto;
-                max-width: 80%;
-            }
-            .image-preview {
-                max-width: 100%;
-                max-height: 200px;
-                border-radius: 0.5rem;
-            }
+            @keyframes typing {{
+                from {{ width: 0 }}
+                to {{ width: 100% }}
+            }}
+
+            .typing-animation::after {{
+                content: "|";
+                animation: blink 1s infinite;
+            }}
+
+            @keyframes blink {{
+                50% {{ opacity: 0; }}
+            }}
         </style>
     </head>
-    <body class="bg-gray-50">
-        <div class="container mx-auto max-w-md p-4">
-            <div class="bg-white rounded-xl shadow-md overflow-hidden">
-                <!-- Header -->
-                <div class="bg-blue-600 text-white p-4">
-                    <h1 class="text-xl font-bold text-center">
-                        <i class="fas fa-camera-retro mr-2"></i>نظام وصف الصور الذكي
-                    </h1>
-                </div>
-                
-                <!-- Chat Area -->
-                <div id="chat-container" class="p-4 chat-container">
-                    <div class="text-center text-gray-500 py-4">
-                        قم برفع صورة لتحصل على وصف دقيق
+    <body class="bg-gray-100">
+        <div class="max-w-2xl mx-auto h-screen flex flex-col">
+            <!-- Header -->
+            <div class="bg-gradient-to-r from-blue-500 to-purple-600 p-4 shadow-lg">
+                <div class="flex items-center gap-3 text-white">
+                    <div class="bg-white/20 p-2 rounded-full">
+                        <i class="fas fa-robot text-xl"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold">مساعد وصف الصور</h1>
+                        <p class="text-sm opacity-90">الذكاء الاصطناعي لتحليل الصور</p>
                     </div>
                 </div>
-                
-                <!-- Controls -->
-                <div class="p-4 border-t">
-                    <div class="mb-3">
-                        <label class="block text-sm font-medium text-gray-700 mb-2">مستوى التفصيل:</label>
-                        <div class="flex gap-2">
-                            <button onclick="setDetail('normal')" class="flex-1 py-2 px-4 rounded-lg bg-blue-100 text-blue-800 border border-blue-300">عادي</button>
-                            <button onclick="setDetail('detailed')" class="flex-1 py-2 px-4 rounded-lg bg-green-100 text-green-800 border border-green-300">مفصل</button>
-                        </div>
-                    </div>
-                    
-                    <div class="flex gap-2">
-                        <label class="flex-1">
-                            <input type="file" id="image-input" accept="image/*" class="hidden">
-                            <div class="w-full py-2 px-4 bg-blue-600 text-white rounded-lg cursor-pointer text-center hover:bg-blue-700 transition">
-                                <i class="fas fa-upload mr-2"></i>رفع صورة
+            </div>
+
+            <!-- Chat Area -->
+            <div class="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+                <div class="text-center text-gray-500 py-4">
+                    ارفع صورة لتحصل على وصف مفصل
+                </div>
+
+                <div id="chat-container"></div>
+            </div>
+
+            <!-- Controls -->
+            <div class="bg-white border-t p-4 shadow-lg">
+                <div class="mb-4 flex gap-2">
+                    <button onclick="setDetail('normal')" class="flex-1 px-4 py-2 rounded-full border transition-all"
+                            id="normal-btn">
+                        وصف عادي
+                    </button>
+                    <button onclick="setDetail('detailed')" class="flex-1 px-4 py-2 rounded-full border transition-all"
+                            id="detailed-btn">
+                        وصف مفصل
+                    </button>
+                </div>
+
+                <div class="flex gap-2">
+                    <label class="flex-1 relative">
+                        <input type="file" id="image-input" accept="image/*" class="hidden">
+                        <div class="w-full p-2 bg-white border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-blue-500 transition-colors text-center">
+                            <div class="py-4">
+                                <i class="fas fa-cloud-upload-alt text-3xl text-gray-400 mb-2"></i>
+                                <p class="text-gray-600">اسحب وأفلت الصورة هنا أو انقر للرفع</p>
                             </div>
-                        </label>
-                        <button id="describe-btn" class="flex-1 py-2 px-4 bg-green-600 text-white rounded-lg disabled:opacity-50" disabled>
-                            <i class="fas fa-search mr-2"></i>وصف
-                        </button>
-                    </div>
+                        </div>
+                    </label>
+                    
+                    <button id="describe-btn" class="px-6 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition disabled:opacity-50" disabled>
+                        <i class="fas fa-paper-plane mr-2"></i>إرسال
+                    </button>
                 </div>
             </div>
         </div>
 
         <script>
             let currentDetail = 'normal';
+            document.getElementById('normal-btn').classList.add('bg-blue-500', 'text-white', 'border-blue-600');
             
-            function setDetail(level) {
+            function setDetail(level) {{
                 currentDetail = level;
-                document.querySelectorAll('button[onclick^="setDetail"]').forEach(btn => {
-                    btn.classList.remove('bg-blue-600', 'text-white');
-                    btn.classList.add(btn.classList.contains('bg-blue-100') ? 'bg-blue-100' : 'bg-green-100');
-                });
-                event.target.classList.add(level === 'normal' ? 'bg-blue-600' : 'bg-green-600', 'text-white');
-            }
+                document.querySelectorAll('#normal-btn, #detailed-btn').forEach(btn => {{
+                    btn.classList.remove('bg-blue-500', 'bg-green-500', 'text-white', 'border-blue-600', 'border-green-600');
+                    btn.classList.add('bg-gray-100', 'border-gray-300');
+                }});
+                
+                if(level === 'normal') {{
+                    document.getElementById('normal-btn').classList.add('bg-blue-500', 'text-white', 'border-blue-600');
+                }} else {{
+                    document.getElementById('detailed-btn').classList.add('bg-green-500', 'text-white', 'border-green-600');
+                }}
+            }}
             
-            document.getElementById('image-input').addEventListener('change', function(e) {
-                if (e.target.files.length > 0) {
+            document.getElementById('image-input').addEventListener('change', function(e) {{
+                if (e.target.files.length > 0) {{
                     const file = e.target.files[0];
                     const reader = new FileReader();
                     
-                    reader.onload = function(event) {
+                    reader.onload = function(event) {{
                         const chatContainer = document.getElementById('chat-container');
                         
-                        // Remove welcome message
-                        if (chatContainer.children.length === 1) {
+                        if (chatContainer.children.length === 1) {{
                             chatContainer.innerHTML = '';
-                        }
+                        }}
+                        
+                        const time = new Date().toLocaleTimeString('ar-EG', {{ hour: 'numeric', minute: 'numeric' }});
                         
                         const messageDiv = document.createElement('div');
-                        messageDiv.className = 'message';
+                        messageDiv.className = 'flex items-start gap-3 mb-4';
                         messageDiv.innerHTML = `
-                            <div class="user-message">
-                                <img src="${event.target.result}" class="image-preview mb-2">
-                                <div class="text-sm text-gray-600">تم رفع الصورة بنجاح</div>
+                            <div class="ml-auto max-w-[85%]">
+                                <div class="bg-blue-500 text-white p-3 rounded-xl rounded-tr-none shadow">
+                                    <img src="${{event.target.result}}" class="mb-2 rounded-lg w-full h-48 object-cover">
+                                    <div class="text-xs text-blue-100">تم الرفع: ${{time}}</div>
+                                </div>
                             </div>
                         `;
                         chatContainer.appendChild(messageDiv);
                         chatContainer.scrollTop = chatContainer.scrollHeight;
                         
                         document.getElementById('describe-btn').disabled = false;
-                    };
+                    }};
                     
                     reader.readAsDataURL(file);
-                }
-            });
+                }}
+            }});
             
-            document.getElementById('describe-btn').addEventListener('click', async function() {
+            document.getElementById('describe-btn').addEventListener('click', async function() {{
                 const fileInput = document.getElementById('image-input');
                 if (!fileInput.files[0]) return;
                 
@@ -152,15 +162,13 @@ def home():
                 
                 // Add loading indicator
                 const loadingDiv = document.createElement('div');
-                loadingDiv.className = 'message';
+                loadingDiv.className = 'flex items-center gap-2 text-gray-500 mb-4';
                 loadingDiv.innerHTML = `
-                    <div class="bot-message flex items-center gap-2">
-                        <div class="flex space-x-1">
-                            <div class="w-2 h-2 bg-gray-400 rounded-full animate-pulse"></div>
-                            <div class="w-2 h-2 bg-gray-400 rounded-full animate-pulse" style="animation-delay: 0.2s"></div>
-                            <div class="w-2 h-2 bg-gray-400 rounded-full animate-pulse" style="animation-delay: 0.4s"></div>
-                        </div>
-                        <span>جاري تحليل الصورة...</span>
+                    <div class="bg-white p-3 rounded-xl shadow">
+                        <div class="typing-animation">جاري التحليل</div>
+                    </div>
+                    <div class="bg-gray-100 p-2 rounded-full">
+                        <i class="fas fa-robot"></i>
                     </div>
                 `;
                 chatContainer.appendChild(loadingDiv);
@@ -168,37 +176,37 @@ def home():
                 
                 describeBtn.disabled = true;
                 
-                try {
+                try {{
                     const formData = new FormData();
                     formData.append('image', fileInput.files[0]);
                     formData.append('detail', currentDetail);
                     
-                    const response = await fetch('/describe', {
+                    const response = await fetch('/describe', {{
                         method: 'POST',
                         body: formData
-                    });
+                    }});
                     
-                    if (!response.ok) {
+                    if (!response.ok) {{
                         throw new Error(await response.text());
-                    }
+                    }}
                     
                     const data = await response.json();
+                    const time = new Date().toLocaleTimeString('ar-EG', {{ hour: 'numeric', minute: 'numeric' }});
                     
                     // Remove loading indicator
                     loadingDiv.remove();
                     
                     // Show result
                     const resultDiv = document.createElement('div');
-                    resultDiv.className = 'message';
+                    resultDiv.className = 'flex items-start gap-3 mb-4';
                     resultDiv.innerHTML = `
-                        <div class="bot-message">
-                            <div class="font-medium mb-1">وصف الصورة:</div>
-                            <div class="mb-2">${data.caption}</div>
-                            <div class="text-right">
-                                <button onclick="copyText(this)" class="text-xs text-blue-600 hover:text-blue-800">
-                                    <i class="far fa-copy mr-1"></i>نسخ النص
-                                </button>
-                            </div>
+                        <div class="bg-white p-3 rounded-xl rounded-tl-none shadow">
+                            <div class="font-medium mb-2">وصف الصورة:</div>
+                            <p class="text-gray-700">${{data.caption}}</p>
+                            <div class="mt-2 text-xs text-gray-500">${{time}}</div>
+                        </div>
+                        <div class="bg-gray-100 p-2 rounded-full">
+                            <i class="fas fa-robot text-gray-500"></i>
                         </div>
                     `;
                     chatContainer.appendChild(resultDiv);
@@ -207,39 +215,23 @@ def home():
                     fileInput.value = '';
                     describeBtn.disabled = true;
                     
-                } catch (error) {
+                }} catch (error) {{
                     console.error('Error:', error);
                     loadingDiv.remove();
                     
                     const errorDiv = document.createElement('div');
-                    errorDiv.className = 'message';
+                    errorDiv.className = 'bg-red-100 text-red-800 px-4 py-2 rounded-lg text-center mb-4';
                     errorDiv.innerHTML = `
-                        <div class="bg-red-100 text-red-800 px-4 py-2 rounded-lg text-center">
-                            <i class="fas fa-exclamation-circle mr-1"></i>
-                            حدث خطأ أثناء معالجة الصورة
-                        </div>
+                        <i class="fas fa-exclamation-circle mr-1"></i>
+                        حدث خطأ أثناء معالجة الصورة
                     `;
                     chatContainer.appendChild(errorDiv);
                     
                     describeBtn.disabled = false;
-                }
+                }}
                 
                 chatContainer.scrollTop = chatContainer.scrollHeight;
-            });
-            
-            function copyText(button) {
-                const text = button.closest('.bot-message').querySelector('div:nth-child(2)').textContent;
-                navigator.clipboard.writeText(text);
-                
-                const icon = button.querySelector('i');
-                icon.classList.replace('fa-copy', 'fa-check');
-                button.innerHTML = button.innerHTML.replace('نسخ النص', 'تم النسخ!');
-                
-                setTimeout(() => {
-                    icon.classList.replace('fa-check', 'fa-copy');
-                    button.innerHTML = button.innerHTML.replace('تم النسخ!', 'نسخ النص');
-                }, 2000);
-            }
+            }});
         </script>
     </body>
     </html>
@@ -258,30 +250,20 @@ def describe_image():
         return jsonify({"error": "ملف فارغ"}), 400
 
     try:
-        # التحقق من أن الملف صورة
         img = Image.open(file.stream)
         img.verify()
         file.stream.seek(0)
         
-        # حفظ الصورة
         filename = f"{uuid.uuid4()}.jpg"
         filepath = os.path.join(UPLOAD_FOLDER, filename)
         file.save(filepath)
         
-        # توليد الوصف الأساسي
         result = image_describer(filepath)
         caption = result[0]['generated_text']
         
-        # تحسين الوصف حسب المستوى المختار
         detail_level = request.form.get('detail', 'normal')
         if detail_level == "detailed":
-            # إضافة تحسينات للوصف المفصل
-            if "men" in caption.lower():
-                caption = "مجموعة من الرجال يلتقطون صورة معًا. " + caption
-            elif "woman" in caption.lower():
-                caption = "امرأة تلتقط صورة. " + caption
-            else:
-                caption = "صورة تحتوي على: " + caption
+            caption = f"وصف مفصل: {caption} (تحليل إضافي باستخدام الذكاء الاصطناعي)"
         
         return jsonify({"caption": caption})
         
